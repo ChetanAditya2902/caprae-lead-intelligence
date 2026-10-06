@@ -112,6 +112,17 @@ function displayOrUnavailable(value: string | number | null): string {
   return value == null || value === "" ? "Unavailable" : String(value);
 }
 
+function formatUtcDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Unavailable";
+
+  const monthNames = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  ];
+  return `${monthNames[date.getUTCMonth()]} ${date.getUTCDate()}, ${date.getUTCFullYear()}`;
+}
+
 function LeadDetail({ lead, score }: LeadDetailProps) {
   const [brief, setBrief] = useState<StoredLeadBrief>(() => ({
     summary: lead.aiSummary,
@@ -268,7 +279,7 @@ function LeadDetail({ lead, score }: LeadDetailProps) {
               <div><dt>Funding signal</dt><dd>{displayOrUnavailable(lead.fundingSignal)}</dd></div>
               <div><dt>Technologies</dt><dd>{lead.technologies.length ? lead.technologies.join(", ") : "Unavailable"}</dd></div>
               <div><dt>Data source</dt><dd>{displayOrUnavailable(lead.dataSource)}</dd></div>
-              <div><dt>Last updated</dt><dd>{new Date(lead.lastUpdated).toLocaleDateString()}</dd></div>
+              <div><dt>Last updated</dt><dd>{formatUtcDate(lead.lastUpdated)}</dd></div>
               <div><dt>Website</dt><dd>{websiteUrl ? <a href={websiteUrl} rel="noreferrer" target="_blank">{lead.website}</a> : displayOrUnavailable(lead.website)}</dd></div>
               <div><dt>Domain</dt><dd>{displayOrUnavailable(lead.domain)}</dd></div>
             </dl>

@@ -6,14 +6,20 @@ import type { LeadListResponse, LeadRecord } from "@/types/lead-record";
 
 type PriorityFilter = "ALL" | "HIGH" | "MEDIUM" | "LOW";
 type SortOption = "score" | "company" | "revenue" | "employees";
+type DataQualityFilter = "" | "COMPLETE" | "NEEDS_REVIEW";
 
 type DashboardFilters = {
   query: string;
   priority: PriorityFilter;
   industry: string;
   location: string;
+  minEmployees: string;
+  maxEmployees: string;
+  minRevenue: string;
+  maxRevenue: string;
   minScore: string;
   maxScore: string;
+  dataQuality: DataQualityFilter;
   sort: SortOption;
   page: number;
 };
@@ -23,8 +29,13 @@ const initialFilters: DashboardFilters = {
   priority: "ALL",
   industry: "",
   location: "",
+  minEmployees: "",
+  maxEmployees: "",
+  minRevenue: "",
+  maxRevenue: "",
   minScore: "",
   maxScore: "",
+  dataQuality: "",
   sort: "score",
   page: 1,
 };
@@ -76,8 +87,13 @@ function buildQueryString(filters: DashboardFilters, format?: "csv"): string {
   if (filters.priority !== "ALL") params.set("priority", filters.priority);
   if (filters.industry) params.set("industry", filters.industry);
   if (filters.location) params.set("location", filters.location);
+  if (filters.minEmployees) params.set("minEmployees", filters.minEmployees);
+  if (filters.maxEmployees) params.set("maxEmployees", filters.maxEmployees);
+  if (filters.minRevenue) params.set("minRevenue", filters.minRevenue);
+  if (filters.maxRevenue) params.set("maxRevenue", filters.maxRevenue);
   if (filters.minScore) params.set("minScore", filters.minScore);
   if (filters.maxScore) params.set("maxScore", filters.maxScore);
+  if (filters.dataQuality) params.set("dataQuality", filters.dataQuality);
   if (filters.sort !== "score") params.set("sort", filters.sort);
   if (format) params.set("format", format);
   else {
@@ -85,6 +101,73 @@ function buildQueryString(filters: DashboardFilters, format?: "csv"): string {
     params.set("pageSize", "25");
   }
   return params.toString();
+}
+
+type ActiveFilter = {
+  key: string;
+  label: string;
+  updates: Partial<DashboardFilters>;
+};
+
+function activeFilters(filters: DashboardFilters): ActiveFilter[] {
+  const active: ActiveFilter[] = [];
+  if (filters.query.trim()) {
+    active.push({
+      key: "query",
+      label: `Search: ${filters.query.trim()}`,
+      updates: { query: "" },
+    });
+  }
+  if (filters.priority !== "ALL") {
+    active.push({
+      key: "priority",
+      label: `Priority: ${filters.priority.toLowerCase()}`,
+      updates: { priority: "ALL" },
+    });
+  }
+  if (filters.industry) {
+    active.push({
+      key: "industry",
+      label: `Industry: ${filters.industry}`,
+      updates: { industry: "" },
+    });
+  }
+  if (filters.location) {
+    active.push({
+      key: "location",
+      label: `Location: ${filters.location}`,
+      updates: { location: "" },
+    });
+  }
+  if (filters.minEmployees || filters.maxEmployees) {
+    active.push({
+      key: "employees",
+      label: `Employees: ${filters.minEmployees || "0"}–${filters.maxEmployees || "any"}`,
+      updates: { minEmployees: "", maxEmployees: "" },
+    });
+  }
+  if (filters.minRevenue || filters.maxRevenue) {
+    active.push({
+      key: "revenue",
+      label: `Revenue (USD): ${filters.minRevenue || "$0"}–${filters.maxRevenue ? `$${filters.maxRevenue}` : "any"}`,
+      updates: { minRevenue: "", maxRevenue: "" },
+    });
+  }
+  if (filters.minScore || filters.maxScore) {
+    active.push({
+      key: "score",
+      label: `Score: ${filters.minScore || "0"}–${filters.maxScore || "100"}`,
+      updates: { minScore: "", maxScore: "" },
+    });
+  }
+  if (filters.dataQuality) {
+    active.push({
+      key: "quality",
+      label: filters.dataQuality === "COMPLETE" ? "Data: complete" : "Data: needs review",
+      updates: { dataQuality: "" },
+    });
+  }
+  return active;
 }
 
 function LeadSkeletonRows() {
@@ -168,9 +251,18 @@ function LeadRow({ lead }: { lead: LeadRecord }) {
       </td>
       <td className="top-signal-cell" title={lead.topSignal}>{lead.topSignal}</td>
       <td>
-        <span className={`contact-status ${lead.emailVerified ? "contact-verified" : ""}`}>
-          {lead.contactStatus}
-        </span>
+        {lead.contactEmail ? (
+          <a className="contact-email-link" href={`mailto:${lead.contactEmail}`}>
+            {lead.contactEmail}
+          </a>
+        ) : (
+          <span className="contact-status">{lead.contactStatus}</span>
+        )}
+        {lead.contactEmail && (
+          <small className={`contact-status ${lead.emailVerified ? "contact-verified" : ""}`}>
+            {lead.emailVerified ? "Verified" : "Unverified"}
+          </small>
+        )}
       </td>
     </tr>
   );
@@ -186,10 +278,20 @@ export default function Dashboard() {
   const [reloadKey, setReloadKey] = useState(0);
 
   const queryString = useMemo(() => buildQueryString(filters), [filters]);
+  const selectedFilters = activeFilters(filters);
 
   useEffect(() => {
     const controller = new AbortController();
-    const delay = filters.query.trim() ? 250 : 0;
+    const delay =
+      filters.query.trim() ||
+      filters.minEmployees ||
+      filters.maxEmployees ||
+      filters.minRevenue ||
+      filters.maxRevenue ||
+      filters.minScore ||
+      filters.maxScore
+        ? 250
+        : 0;
 
     const timeout = window.setTimeout(() => {
       setLoading(true);
@@ -353,7 +455,7 @@ export default function Dashboard() {
         <div className="workspace-heading">
           <div>
             <h2>Lead opportunities</h2>
-            <p>Search, filter, and sort your database-backed pipeline.</p>
+            <p>Qualify and prioritize the leads in your database.</p>
           </div>
           <button
             className="button button-secondary intelligence-export"
@@ -365,8 +467,8 @@ export default function Dashboard() {
           </button>
         </div>
 
-        <div className="intelligence-filter-bar">
-          <label className="intelligence-search">
+        <div aria-label="Lead filters" className="intelligence-filter-bar">
+          <label className="intelligence-search filter-span-4">
             <span aria-hidden="true">⌕</span>
             <input
               aria-label="Search company, domain, industry, or contact"
@@ -378,7 +480,7 @@ export default function Dashboard() {
             />
           </label>
 
-          <label className="filter-control">
+          <label className="filter-control filter-span-2">
             <span>Priority</span>
             <select
               aria-label="Filter by priority"
@@ -394,7 +496,7 @@ export default function Dashboard() {
             </select>
           </label>
 
-          <label className="filter-control">
+          <label className="filter-control filter-span-2">
             <span>Industry</span>
             <select
               aria-label="Filter by industry"
@@ -408,7 +510,7 @@ export default function Dashboard() {
             </select>
           </label>
 
-          <label className="filter-control">
+          <label className="filter-control filter-span-2">
             <span>Location</span>
             <select
               aria-label="Filter by location"
@@ -422,8 +524,52 @@ export default function Dashboard() {
             </select>
           </label>
 
-          <label className="score-range-control">
-            <span>Score</span>
+          <label className="range-filter-control filter-span-3">
+            <span>Employees</span>
+            <input
+              aria-label="Minimum employee count"
+              min="0"
+              onChange={(event) => updateFilters({ minEmployees: event.target.value })}
+              placeholder="Min"
+              type="number"
+              value={filters.minEmployees}
+            />
+            <span aria-hidden="true">–</span>
+            <input
+              aria-label="Maximum employee count"
+              min="0"
+              onChange={(event) => updateFilters({ maxEmployees: event.target.value })}
+              placeholder="Max"
+              type="number"
+              value={filters.maxEmployees}
+            />
+          </label>
+
+          <label className="range-filter-control filter-span-4">
+            <span>Revenue (USD)</span>
+            <input
+              aria-label="Minimum revenue in USD"
+              min="0"
+              onChange={(event) => updateFilters({ minRevenue: event.target.value })}
+              placeholder="Min"
+              step="0.01"
+              type="number"
+              value={filters.minRevenue}
+            />
+            <span aria-hidden="true">–</span>
+            <input
+              aria-label="Maximum revenue in USD"
+              min="0"
+              onChange={(event) => updateFilters({ maxRevenue: event.target.value })}
+              placeholder="Max"
+              step="0.01"
+              type="number"
+              value={filters.maxRevenue}
+            />
+          </label>
+
+          <label className="range-filter-control filter-span-3">
+            <span>Opportunity score</span>
             <input
               aria-label="Minimum opportunity score"
               max="100"
@@ -445,7 +591,24 @@ export default function Dashboard() {
             />
           </label>
 
-          <label className="filter-control sort-control">
+          <label className="filter-control filter-span-2">
+            <span title="Complete means key company and contact facts are present, revenue currency is known, and the contact email is verified.">
+              Data quality
+            </span>
+            <select
+              aria-label="Filter by data quality"
+              onChange={(event) =>
+                updateFilters({ dataQuality: event.target.value as DataQualityFilter })
+              }
+              value={filters.dataQuality}
+            >
+              <option value="">All records</option>
+              <option value="COMPLETE">Complete and verified</option>
+              <option value="NEEDS_REVIEW">Needs review</option>
+            </select>
+          </label>
+
+          <label className="filter-control filter-span-2">
             <span>Sort</span>
             <select
               aria-label="Sort leads"
@@ -460,24 +623,39 @@ export default function Dashboard() {
               <option value="employees">Employees: most first</option>
             </select>
           </label>
-
-          <button
-            className="clear-filters-button"
-            disabled={
-              !filters.query &&
-              filters.priority === "ALL" &&
-              !filters.industry &&
-              !filters.location &&
-              !filters.minScore &&
-              !filters.maxScore &&
-              filters.sort === "score"
-            }
-            onClick={() => setFilters(initialFilters)}
-            type="button"
-          >
-            Clear
-          </button>
         </div>
+
+        <div className="filter-status-row">
+          <p aria-live="polite" className="matching-count">
+            {loading ? "Updating results…" : `${result?.meta.total ?? 0} matching leads`}
+          </p>
+          {selectedFilters.length > 0 && (
+            <button
+              className="clear-filters-button"
+              onClick={() =>
+                setFilters((current) => ({ ...initialFilters, sort: current.sort }))
+              }
+              type="button"
+            >
+              Clear all filters
+            </button>
+          )}
+        </div>
+        {selectedFilters.length > 0 && (
+          <div aria-label="Active filters" className="active-filter-list">
+            {selectedFilters.map((filter) => (
+              <button
+                aria-label={`Remove filter ${filter.label}`}
+                className="active-filter-chip"
+                key={filter.key}
+                onClick={() => updateFilters(filter.updates)}
+                type="button"
+              >
+                {filter.label}<span aria-hidden="true">×</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         {exportMessage && (
           <p
@@ -540,7 +718,12 @@ export default function Dashboard() {
                 <span aria-hidden="true" className="empty-search-icon">⌕</span>
                 <h3>No leads match these filters</h3>
                 <p>Try a different search or clear one or more filters.</p>
-                <button onClick={() => setFilters(initialFilters)} type="button">
+                <button
+                  onClick={() =>
+                    setFilters((current) => ({ ...initialFilters, sort: current.sort }))
+                  }
+                  type="button"
+                >
                   Clear filters
                 </button>
               </div>
@@ -550,7 +733,7 @@ export default function Dashboard() {
               <span>
                 {loading && result
                   ? "Updating results…"
-                  : `Showing ${firstRow}–${lastRow} of ${result?.meta.total ?? 0} leads`}
+                  : `Showing ${firstRow}–${lastRow} of ${result?.meta.total ?? 0} matching leads`}
               </span>
               <div aria-label="Lead pages" className="intelligence-pagination">
                 <button
