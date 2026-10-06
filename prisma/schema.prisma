@@ -43,6 +43,7 @@ model Lead {
   opportunityScore Int?       @map("opportunity_score") @db.SmallInt
   scoreTier        ScoreTier? @map("score_tier")
   scoreReasons     String[]   @default([]) @map("score_reasons")
+  scoreFactors     LeadScoreFactor[]
   aiSummary        String?    @map("ai_summary") @db.Text
   aiWhyAttractive  String?    @map("ai_why_attractive") @db.Text
   aiStrongestSignals String[]  @default([]) @map("ai_strongest_signals")
@@ -71,4 +72,26 @@ model Lead {
   @@index([lastUpdated(sort: Desc)])
   @@index([emailVerified, phoneVerified])
   @@map("leads")
+}
+
+model LeadScoreFactor {
+  id        String   @id @default(cuid()) @db.VarChar(30)
+  leadId    String   @map("lead_id") @db.VarChar(30)
+  factor    String   @db.VarChar(40)
+  points    Int      @db.SmallInt
+  maxPoints Int      @map("max_points") @db.SmallInt
+  reason    String   @db.Text
+  signal    String   @db.VarChar(12)
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@unique([leadId, factor])
+  @@index([factor, points])
+  @@map("lead_score_factors")
+}
+
+model AiGenerationUsage {
+  day          DateTime @id @db.Date
+  requestCount Int      @default(0) @map("request_count")
+
+  @@map("ai_generation_usage")
 }

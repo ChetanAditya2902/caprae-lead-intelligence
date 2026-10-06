@@ -12,6 +12,13 @@ company and contact data, quality indicators, and an optional AI-generated lead
 brief. Users can search and filter leads, compare their qualification signals,
 inspect score explanations, and export the selected records.
 
+**Repository:** [ChetanAditya2902/caprae-lead-intelligence](https://github.com/ChetanAditya2902/caprae-lead-intelligence)
+
+The implementation is intentionally scoped to one challenge-sized slice
+(approximately five hours): scoring and decision support, with only the data
+model, dashboard, and API work needed to make those features demonstrable. It
+does not attempt to build lead discovery, authentication, or CRM workflows.
+
 ## 2. Problem
 
 Lead generation produces lists of companies, contacts, and enrichment fields.
@@ -33,12 +40,20 @@ obscure why one lead ranks above another, and overlook important data gaps.
 
 ## 4. Why This Feature
 
-SaaSquatch Leads already supports capabilities such as lead discovery,
-enrichment, company insights, revenue estimates, filtering, and export. Lead
-Intelligence extends that workflow rather than duplicating it: the gap it
-addresses is prioritization and actionable decision support. It makes the
-available evidence easier to compare and gives users a reasoned starting point
-for their next action.
+The challenge brief describes the reference SaaSquatch Leads product as
+supporting lead discovery, enrichment, company insights, revenue estimates,
+filtering, and export. This submission treats those as upstream capabilities
+and deliberately does not rebuild them. Instead, it focuses on the next
+decision in that workflow: prioritization and actionable decision support.
+
+The intended UX is designed around three review questions: “Why did this
+company rank here?”, “What important information is missing?”, and “What is a
+reasonable next step?” The dashboard supports rapid comparison through
+filters, score and priority, while the detail view expands the score into
+evidence and separates stored facts from interpretation. Compact analytics
+summarize the entire dataset; simple bars were chosen over decorative charts.
+The reference-product capability summary above comes from the challenge
+materials, not an independent audit of a live SaaSquatch account.
 
 ## 5. Product Workflow
 
@@ -61,31 +76,52 @@ flowchart LR
     Scoring --> Prisma
     Detail[Server-rendered lead detail] --> Scoring
     Detail --> Prisma
+    Prisma --> Factors[(Structured lead score factors)]
     API --> Brief[Server-side AI brief service]
     Brief --> OpenAI[OpenAI API]
     OpenAI --> Brief
     Brief --> Validate[Structured response validation]
     Validate --> Prisma
+    Brief --> Budget[(Daily generation budget)]
 ```
 
 ## 7. Tech Stack
 
-- **Application:** Next.js 16.3.8 App Router, React 19.2.8, TypeScript 5
-- **Styling:** Tailwind CSS 4 and project CSS
+- **Application:** Next.js 16.3.8 App Router, React 19.2.8, TypeScript 5.9.3
+- **Styling:** Tailwind CSS 4.3.3 and project CSS
 - **Database:** PostgreSQL
-- **Data access:** Prisma 7.10 with `@prisma/adapter-pg` and `pg`
-- **AI:** Official OpenAI JavaScript SDK (`openai`); configured model defaults
+- **Data access:** Prisma 7.10.0 with `@prisma/adapter-pg` 7.10.0 and
+  `pg` 8.23.1
+- **AI:** Official OpenAI JavaScript SDK (`openai` 7.28.0); configured model defaults
   to `gpt-4o-mini`
-- **Quality tools:** ESLint 9, TypeScript, Node.js test runner, and `tsx`
+- **Quality tools:** ESLint 9.39.5, TypeScript 5.9.3, Node.js test runner,
+  and `tsx` 4.23.15
 - **Deployment target:** Vercel with a reachable PostgreSQL database
 
 Recharts is not used: the compact dashboard analytics are more clearly shown
 with simple, accessible progress bars.
 
+### API surface
+
+- `GET /api/leads` supports search, priority, industry, location, employee,
+  revenue, score, and data-quality filters; sorting; and bounded pagination.
+- `GET /api/leads?format=csv` exports the filtered result set, capped at
+  10,000 rows.
+- `GET /api/leads/[id]` returns one database-backed lead.
+- `POST /api/ai/leads/[id]/brief` returns a validated cached brief or requests
+  a new one, subject to server configuration and the global daily cap.
+
+These are application routes for the local demo; no public API deployment or
+availability is claimed.
+
 ## 8. Database Design
 
 The PostgreSQL `Lead` model in `prisma/schema.prisma` keeps common business
-fields typed and queryable:
+fields typed and queryable. `LeadScoreFactor` stores each deterministic
+factor's key, earned and maximum points, explanation, and signal separately.
+This gives the detail page and analytics a structured source instead of
+parsing human-readable explanation strings. `AiGenerationUsage` records the
+server-wide AI brief generation count per UTC day.
 
 - Company identity, industry, employee count, revenue and currency, location,
   and technology/business signals
@@ -120,7 +156,10 @@ Factor weights, target criteria, neutral treatment of missing data, and tier
 thresholds are held centrally in `src/lib/scoring/config.ts`. The default tiers
 are **High** (80–100), **Medium** (60–79), and **Low** (0–59). Each score is
 reproducible from the same lead data and configuration, and the detail view
-shows points and the reason for every factor.
+shows points and the reason for every factor. Dashboard priority, score
+filters, analytics, and detail breakdowns use the stored score and factors.
+After changing `scoringConfig`, run `npm run db:rescore` to recalculate every
+database record under the new configuration.
 
 The framework is deterministic and configurable, allowing the business to
 adapt qualification criteria without changing the UI. Weight changes should
@@ -146,7 +185,10 @@ technology, hiring, or events; to call missing fields unavailable; and to
 label conclusions as analysis. These safeguards reduce hallucination risk but
 do not guarantee that model output is correct—users should verify it.
 Validated results and their generation time are stored on the lead and reused
-on later requests unless refreshed.
+on later requests unless explicitly regenerated. A database-backed budget
+limits generation to 25 requests per UTC day across the deployment; failed
+provider attempts also consume a slot. This is a cost guard for a prototype,
+not user authentication or per-user quota management.
 
 ## 11. Data Quality
 
@@ -165,12 +207,14 @@ it is not the same thing as the weighted data-quality score.
 - PostgreSQL indexes support frequently filtered and sorted fields.
 - Lead results are paginated (25 by default, 50 maximum); CSV export is bounded
   at 10,000 rows.
-- Filtering, counts, sorting, and analytics use database queries. The compact
-  analytics aggregate scoring reasons across the database, not only the
+- Filtering, counts, sorting, and analytics use database queries. Analytics
+  aggregate structured factor records across the database, not only the
   visible page.
 - The detail page computes score explanations server-side; database operations
   and AI calls also remain on the server.
 - A complete AI brief is reused rather than regenerated on every page view.
+- AI generation has a global daily budget; it does not implement per-user
+  quotas.
 
 ## 13. Security
 
@@ -180,6 +224,9 @@ it is not the same thing as the weighted data-quality score.
   browser.
 - API query parameters are validated and bounded; AI output is schema- and
   content-validated before storage.
+- AI brief generation has a database-backed global daily cap. The prototype
+  does not include authentication or per-user authorization and is not
+  intended for unrestricted public use.
 - `.env` is intended to remain local and must not be committed. Do not use
   production credentials in this demo.
 
@@ -222,8 +269,31 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000). The seed command inserts
-500 deterministic, synthetic leads. Do not run the demo seed against a
-database containing records you need to preserve.
+500 deterministic, synthetic leads with deliberately varied score and
+completeness profiles. It upserts its deterministic `lead-001`–`lead-500`
+records, resetting those records to seed values; do not run it against records
+you need to preserve.
+
+After changing scoring weights or criteria, recalculate stored scores and
+factor breakdowns:
+
+```powershell
+npm run db:rescore
+```
+
+## Demo Walkthrough (60–90 seconds)
+
+The repository does not include a recorded video. This short capture outline
+keeps the demo focused:
+
+1. Start on the dashboard; show the priority distribution and average scores.
+2. Filter to medium or low priority and point out that the list/count update
+   without navigating away.
+3. Open a lead; show the deterministic score factors and one missing or weak
+   signal.
+4. Request an AI brief only if a valid `OPENAI_API_KEY` with available access
+   is configured. Describe its text as model-generated analysis, not fact.
+5. End with the CSV export or recommended next action.
 
 ## 16. Testing
 
@@ -233,11 +303,13 @@ npm run lint
 npm run build
 ```
 
-`npm test` runs the scoring and AI brief-validation unit tests, including
-priority boundaries, missing and negative signals, deterministic results, and
-structured brief validation. Lint checks the project with ESLint; build runs
-the production Next.js compile and TypeScript checks. The unit suite does not
-make billable OpenAI calls.
+`npm test` runs 25 unit tests for scoring, persisted-score consistency, query
+filter composition and validation, CSV escaping, analytics aggregation, and AI
+brief validation. Coverage includes priority boundaries, missing and negative
+signals, deterministic results, combined filters, spreadsheet formula
+neutralization, and structured brief validation.
+Lint checks the project with ESLint; build runs the production Next.js compile
+and TypeScript checks. The unit suite does not make billable OpenAI calls.
 
 ## 17. Design Decisions
 
@@ -260,6 +332,9 @@ make billable OpenAI calls.
   per-user scoring editor or profile management UI.
 - AI briefs depend on OpenAI credentials, model availability, and account
   access. No live AI call is required to run the rest of the application.
+- No OpenAI-backed brief was verified in this environment because a usable API
+  key/credit was unavailable; with no key configured, the endpoint returns a
+  setup error.
 - The AI brief is an assistive interpretation of stored fields, not external
   research, verified advice, or a substitute for human review.
 - Authentication, CRM write-back, background jobs, and production observability

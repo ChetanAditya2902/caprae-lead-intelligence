@@ -8,6 +8,21 @@ import {
 
 const DEFAULT_MODEL = "gpt-4o-mini";
 const REQUEST_TIMEOUT_MS = 15_000;
+const MAX_DAILY_GENERATIONS = 25;
+
+async function reserveDailyGeneration(): Promise<boolean> {
+  const now = new Date();
+  const utcDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const reservations = await prisma.$queryRaw<Array<{ requestCount: number }>>`
+    INSERT INTO ai_generation_usage (day, request_count)
+    VALUES (${utcDay}, 1)
+    ON CONFLICT (day) DO UPDATE
+      SET request_count = ai_generation_usage.request_count + 1
+      WHERE ai_generation_usage.request_count < ${MAX_DAILY_GENERATIONS}
+    RETURNING request_count AS "requestCount"
+  `;
+  return reservations.length === 1;
+}
 
 function unavailable(name: string | null | undefined): string {
   return name ?? "Unavailable";
@@ -46,6 +61,13 @@ export async function POST(
             "AI briefs are not configured. Add OPENAI_API_KEY to the server environment, then restart the app.",
         },
         { status: 503 },
+      );
+    }
+
+    if (!(await reserveDailyGeneration())) {
+      return Response.json(
+        { error: "The daily AI brief limit has been reached. Please try again tomorrow." },
+        { status: 429 },
       );
     }
 

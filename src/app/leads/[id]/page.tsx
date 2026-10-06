@@ -1,16 +1,19 @@
 import { notFound } from "next/navigation";
 import LeadDetail from "@/components/leads/lead-detail";
 import { prisma } from "@/lib/db/prisma";
-import { scoreLead } from "@/lib/scoring";
+import { scoreFromStoredLead } from "@/lib/scoring/stored";
 
 export default async function LeadDetailPage({
   params,
 }: PageProps<"/leads/[id]">) {
   const { id } = await params;
-  const lead = await prisma.lead.findUnique({ where: { id } });
+  const lead = await prisma.lead.findUnique({
+    where: { id },
+    include: { scoreFactors: true },
+  });
   if (!lead) notFound();
 
-  const score = scoreLead(lead);
+  const score = scoreFromStoredLead(lead);
 
   return (
     <LeadDetail

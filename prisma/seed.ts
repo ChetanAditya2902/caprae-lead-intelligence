@@ -203,10 +203,14 @@ function buildSeedRecords() {
       .replace(/^-|-$/g, "") + ".example";
     const industry = industries[sourceIndex % industries.length];
     const location = locations[sourceIndex % locations.length];
-    const lowFit = index >= companyNames.length && index < duplicateStartIndex && index % 13 === 0;
+    const profilePosition = index % 10;
+    const lowFit = profilePosition >= 7;
+    const mediumFit = profilePosition >= 3 && profilePosition < 7;
     const incomplete = index >= incompleteStartIndex && index < duplicateStartIndex;
     const employeeCount = lowFit
       ? 20
+      : mediumFit
+      ? 60 + (index % 35)
       : incomplete && index === incompleteStartIndex
       ? null
       : employeeCounts[sourceIndex % employeeCounts.length];
@@ -236,6 +240,8 @@ function buildSeedRecords() {
       employeeCount,
       revenue: lowFit
         ? new Prisma.Decimal("250000")
+        : mediumFit
+        ? new Prisma.Decimal(`${1_000_000 + (index % 8) * 500_000}`)
         : incomplete && index === incompleteStartIndex + 3
         ? null
         : employeeCount === null
@@ -248,31 +254,43 @@ function buildSeedRecords() {
         : "USD",
       location: lowFit
         ? "Sao Paulo"
+        : mediumFit
+        ? "Melbourne"
         : incomplete && index % 4 === 1
           ? null
           : location[0],
       country: lowFit
         ? "BR"
+        : mediumFit
+        ? "AU"
         : incomplete && index % 4 === 1
           ? null
           : location[1],
       technologies: lowFit
         ? ["On-premise proprietary CRM"]
+        : mediumFit
+        ? ["Legacy desktop system"]
         : incomplete && index % 4 === 2
           ? []
           : technologySets[sourceIndex % technologySets.length],
       hiringSignal: lowFit
         ? "Hiring freeze with no open roles"
+        : mediumFit
+        ? "0 open roles reported"
         : index % 3 === 0
           ? null
           : `${3 + (index % 18)} open roles across product and commercial teams`,
       growthSignal: lowFit
         ? "Declining demand and contraction across core markets"
+        : mediumFit
+        ? "No recent growth reported"
         : index % 4 === 0
           ? null
           : ["New regional expansion", "Growing product portfolio", "Increasing customer adoption"][index % 3],
       fundingSignal: lowFit
         ? "No funding"
+        : mediumFit
+        ? "No funding reported"
         : index % 5 === 0
           ? null
           : ["Seed extension", "Series A", "Series B", "Growth round"][index % 4],
@@ -301,6 +319,7 @@ function buildSeedRecords() {
       opportunityScore: score.totalScore,
       scoreTier: score.tier,
       scoreReasons: score.reasons,
+      scoreFactors: score.factors,
     };
   });
 }
@@ -317,10 +336,27 @@ async function main() {
 
   try {
     for (const record of buildSeedRecords()) {
+      const { scoreFactors, ...leadRecord } = record;
+      const factorData = scoreFactors.map((factor) => ({
+        factor: factor.factor,
+        points: factor.points,
+        maxPoints: factor.maxPoints,
+        reason: factor.reason,
+        signal: factor.signal,
+      }));
       await prisma.lead.upsert({
-        where: { id: record.id },
-        create: record,
-        update: record,
+        where: { id: leadRecord.id },
+        create: {
+          ...leadRecord,
+          scoreFactors: { create: factorData },
+        },
+        update: {
+          ...leadRecord,
+          scoreFactors: {
+            deleteMany: {},
+            create: factorData,
+          },
+        },
       });
     }
     console.info(`Seeded ${seedRecordCount} synthetic SaaSquatch lead records.`);

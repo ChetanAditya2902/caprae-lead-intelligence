@@ -7,12 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --import tsx --test src/lib/scoring/scoring.test.ts src/lib/ai/lead-brief.test.ts",
+    "test": "node --import tsx --test src/lib/scoring/scoring.test.ts src/lib/scoring/stored.test.ts src/lib/ai/lead-brief.test.ts src/lib/leads/lead-query.test.ts src/lib/leads/scoring-analytics.test.ts src/lib/leads/csv.test.ts",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:validate": "prisma validate",
     "db:migrate": "prisma migrate dev",
-    "db:seed": "prisma db seed"
+    "db:seed": "prisma db seed",
+    "db:rescore": "tsx prisma/rescore.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",
