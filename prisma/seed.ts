@@ -1,5 +1,6 @@
 import { PrismaPg } from "@prisma/adapter-pg";
-import { Prisma, PrismaClient, ScoreTier } from "../src/generated/prisma/client";
+import { Prisma, PrismaClient } from "../src/generated/prisma/client";
+import { scoreLead } from "../src/lib/scoring";
 
 const companyNames = [
   "Northstar Robotics",
@@ -191,34 +192,6 @@ function getCompanyName(index: number): string {
   return `${brand} ${suffix}`;
 }
 
-function getScoreTier(index: number, duplicate: boolean): ScoreTier | null {
-  if (duplicate) return ScoreTier.LOW;
-  if (index < 75) return ScoreTier.HIGH;
-  if (index < 250) return ScoreTier.MEDIUM;
-  if (index < incompleteStartIndex) return ScoreTier.LOW;
-  return null;
-}
-
-function getReasons(index: number, tier: ScoreTier | null): string[] {
-  if (tier === null) return [];
-  if (index >= duplicateStartIndex) {
-    return ["Duplicate-like domain; review record quality before prioritizing."];
-  }
-
-  const reasons: string[] = [];
-  if (index < 75) {
-    reasons.push("Strong company size and industry alignment.");
-  } else if (index < 250) {
-    reasons.push("Moderate company size and industry alignment.");
-  } else {
-    reasons.push("Limited or unconfirmed fit signals.");
-  }
-  if (index % 3 !== 0) reasons.push("Recent hiring or growth activity is reported.");
-  if (index % 4 === 0) reasons.push("Relevant technology signals are present.");
-  if (index % 5 === 0) reasons.push("Some contact or company data may need verification.");
-  return reasons;
-}
-
 function buildSeedRecords() {
   return Array.from({ length: seedRecordCount }, (_, index) => {
     const duplicate = index >= duplicateStartIndex;
@@ -230,7 +203,6 @@ function buildSeedRecords() {
       .replace(/^-|-$/g, "") + ".example";
     const industry = industries[sourceIndex % industries.length];
     const location = locations[sourceIndex % locations.length];
-    const tier = getScoreTier(index, duplicate);
     const incomplete = index >= incompleteStartIndex && index < duplicateStartIndex;
     const employeeCount = incomplete && index === incompleteStartIndex
       ? null
@@ -243,7 +215,7 @@ function buildSeedRecords() {
     const createdAt = new Date(Date.UTC(2025, 0, 1 + (index % 28)));
     const lastUpdated = new Date(Date.UTC(2026, index % 9, 1 + (index % 27)));
 
-    return {
+    const record = {
       id: `lead-${nameNumber}`,
       companyName,
       website: incomplete && index % 2 === 0 ? null : `https://${domain}`,
@@ -258,7 +230,9 @@ function buildSeedRecords() {
           : new Prisma.Decimal(
               (employeeCount * (100_000 + (index % 9) * 25_000)).toFixed(2),
             ),
-      revenueCurrency: incomplete && index === 45 ? null : "USD",
+      revenueCurrency: incomplete && index === incompleteStartIndex + 3
+        ? null
+        : "USD",
       location: incomplete && index % 4 === 1 ? null : location[0],
       country: incomplete && index % 4 === 1 ? null : location[1],
       technologies: incomplete && index % 4 === 2
@@ -278,17 +252,6 @@ function buildSeedRecords() {
       phoneVerified: phoneAvailable && index % 3 === 0,
       dataSource: duplicate ? "synthetic-duplicate-test" : "synthetic-challenge-seed",
       lastUpdated,
-      opportunityScore: tier === null
-        ? null
-        : duplicate
-          ? 42 + (index - duplicateStartIndex) * 5
-          : tier === ScoreTier.HIGH
-            ? 85 + ((index * 7) % 15)
-            : tier === ScoreTier.MEDIUM
-              ? 60 + ((index * 7) % 20)
-              : 20 + ((index * 7) % 40),
-      scoreTier: tier,
-      scoreReasons: getReasons(index, tier),
       aiSummary: null,
       aiOutreachAngle: null,
       aiRisks: [],
@@ -296,6 +259,13 @@ function buildSeedRecords() {
       aiGeneratedAt: null,
       createdAt,
       updatedAt: createdAt,
+    };
+    const score = scoreLead(record);
+    return {
+      ...record,
+      opportunityScore: score.totalScore,
+      scoreTier: score.tier,
+      scoreReasons: score.reasons,
     };
   });
 }
