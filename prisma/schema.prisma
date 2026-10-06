@@ -44,6 +44,8 @@ model Lead {
   scoreTier        ScoreTier? @map("score_tier")
   scoreReasons     String[]   @default([]) @map("score_reasons")
   aiSummary        String?    @map("ai_summary") @db.Text
+  aiWhyAttractive  String?    @map("ai_why_attractive") @db.Text
+  aiStrongestSignals String[]  @default([]) @map("ai_strongest_signals")
   aiOutreachAngle  String?    @map("ai_outreach_angle") @db.Text
   aiRisks          String[]   @default([]) @map("ai_risks")
   aiNextAction     String?    @map("ai_next_action") @db.Text
