@@ -1,0 +1,72 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ScoreTier {
+  HIGH
+  MEDIUM
+  LOW
+
+  @@map("score_tier")
+}
+
+model Lead {
+  id               String     @id @default(cuid()) @db.VarChar(30)
+  companyName      String     @map("company_name") @db.VarChar(255)
+  website          String?    @db.VarChar(255)
+  domain           String?    @db.VarChar(255)
+  industry         String?    @db.VarChar(120)
+  subIndustry      String?    @map("sub_industry") @db.VarChar(120)
+  employeeCount    Int?       @map("employee_count")
+  revenue          Decimal?   @db.Decimal(16, 2)
+  revenueCurrency  String?    @map("revenue_currency") @db.Char(3)
+  location         String?    @db.VarChar(160)
+  country          String?    @db.Char(2)
+  technologies     String[]   @default([])
+  hiringSignal     String?    @map("hiring_signal") @db.Text
+  growthSignal     String?    @map("growth_signal") @db.Text
+  fundingSignal    String?    @map("funding_signal") @db.Text
+  contactName      String?    @map("contact_name") @db.VarChar(160)
+  contactTitle     String?    @map("contact_title") @db.VarChar(160)
+  contactEmail     String?    @map("contact_email") @db.VarChar(254)
+  contactPhone     String?    @map("contact_phone") @db.VarChar(40)
+  linkedinUrl      String?    @map("linkedin_url") @db.VarChar(255)
+  emailVerified    Boolean    @default(false) @map("email_verified")
+  phoneVerified    Boolean    @default(false) @map("phone_verified")
+  dataSource       String?    @map("data_source") @db.VarChar(120)
+  lastUpdated      DateTime   @default(now()) @map("last_updated") @db.Timestamptz(3)
+  opportunityScore Int?       @map("opportunity_score") @db.SmallInt
+  scoreTier        ScoreTier? @map("score_tier")
+  scoreReasons     String[]   @default([]) @map("score_reasons")
+  aiSummary        String?    @map("ai_summary") @db.Text
+  aiOutreachAngle  String?    @map("ai_outreach_angle") @db.Text
+  aiRisks          String[]   @default([]) @map("ai_risks")
+  aiNextAction     String?    @map("ai_next_action") @db.Text
+  aiGeneratedAt    DateTime?  @map("ai_generated_at") @db.Timestamptz(3)
+  createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([companyName])
+  @@index([domain])
+  @@index([industry, subIndustry])
+  @@index([employeeCount])
+  @@index([revenue])
+  @@index([revenueCurrency])
+  @@index([country, location])
+  @@index([technologies], type: Gin)
+  @@index([hiringSignal])
+  @@index([growthSignal])
+  @@index([fundingSignal])
+  @@index([contactEmail])
+  @@index([dataSource])
+  @@index([opportunityScore(sort: Desc)])
+  @@index([scoreTier, opportunityScore(sort: Desc)])
+  @@index([lastUpdated(sort: Desc)])
+  @@index([emailVerified, phoneVerified])
+  @@map("leads")
+}
