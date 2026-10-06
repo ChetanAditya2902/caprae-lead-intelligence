@@ -208,6 +208,37 @@ function MetricCard({
   );
 }
 
+function AnalyticsProgress({
+  label,
+  value,
+  detail,
+  tone,
+}: {
+  label: string;
+  value: number;
+  detail: string;
+  tone?: string;
+}) {
+  return (
+    <div className="analytics-progress-row">
+      <div className="analytics-progress-copy">
+        <span>{label}</span>
+        <strong>{detail}</strong>
+      </div>
+      <div
+        aria-label={`${label}: ${detail}`}
+        aria-valuemax={100}
+        aria-valuemin={0}
+        aria-valuenow={value}
+        className="analytics-progress-track"
+        role="progressbar"
+      >
+        <span className={tone ?? ""} style={{ width: `${value}%` }} />
+      </div>
+    </div>
+  );
+}
+
 function LeadRow({ lead }: { lead: LeadRecord }) {
   const score = lead.opportunityScore;
   return (
@@ -449,6 +480,82 @@ export default function Dashboard() {
           label="Average opportunity score"
           value={loading && !result ? "—" : result?.summary.averageScore ?? 0}
         />
+      </section>
+
+      <section aria-labelledby="lead-analytics-title" className="lead-analytics">
+        <div className="lead-analytics-heading">
+          <div>
+            <h2 id="lead-analytics-title">Lead quality snapshot</h2>
+            <p>Quality signals across your full database</p>
+          </div>
+          <div className="analytics-summary">
+            <div>
+              <span>Average opportunity score</span>
+              <strong>
+                {loading && !result ? "—" : `${result?.summary.averageScore ?? 0}/100`}
+              </strong>
+            </div>
+            <div>
+              <span>Average data quality score</span>
+              <strong>
+                {loading && !result
+                  ? "—"
+                  : result?.summary.averageDataQualityScore == null
+                    ? "—"
+                    : `${result.summary.averageDataQualityScore.toFixed(1)}%`}
+              </strong>
+            </div>
+          </div>
+        </div>
+
+        <div className="lead-analytics-grid">
+          <div className="lead-analytics-panel">
+            <h3>Priority distribution</h3>
+            {(["HIGH", "MEDIUM", "LOW"] as const).map((tier) => {
+              const count =
+                tier === "HIGH"
+                  ? result?.summary.highPriority ?? 0
+                  : tier === "MEDIUM"
+                    ? result?.summary.mediumPriority ?? 0
+                    : result?.summary.lowPriority ?? 0;
+              const total = result?.summary.total ?? 0;
+              const percent = total ? Math.round((count / total) * 100) : 0;
+              const label = tier.charAt(0) + tier.slice(1).toLowerCase();
+
+              return (
+                <AnalyticsProgress
+                  detail={`${count} · ${percent}%`}
+                  key={tier}
+                  label={label}
+                  tone={`analytics-${tier.toLowerCase()}`}
+                  value={percent}
+                />
+              );
+            })}
+          </div>
+
+          <div className="lead-analytics-panel">
+            <h3>Top scoring factors</h3>
+            {result?.summary.topScoringFactors.length ? (
+              result.summary.topScoringFactors.map((factor) => (
+                <AnalyticsProgress
+                  detail={`${factor.averageScore.toFixed(1)}%`}
+                  key={factor.factor}
+                  label={
+                    factor.factor === "Contact completeness"
+                      ? "Contact quality"
+                      : factor.factor
+                  }
+                  value={factor.averageScore}
+                />
+              ))
+            ) : (
+              <p className="analytics-empty">
+                Scoring factor analytics will appear when scored leads are available.
+              </p>
+            )}
+          </div>
+        </div>
       </section>
 
       <section aria-label="Lead workspace" className="intelligence-workspace">

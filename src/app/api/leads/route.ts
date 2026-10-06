@@ -264,6 +264,7 @@ export async function GET(request: Request) {
       mediumPriority,
       lowPriority,
       totalLeads,
+      factorAggregates,
     ] = await Promise.all([
       prisma.lead.count({ where }),
       prisma.lead.findMany({
@@ -292,6 +293,27 @@ export async function GET(request: Request) {
       prisma.lead.count({ where: { scoreTier: ScoreTier.MEDIUM } }),
       prisma.lead.count({ where: { scoreTier: ScoreTier.LOW } }),
       prisma.lead.count(),
+      exportCsv
+        ? Promise.resolve([])
+        : prisma.$queryRaw<
+            Array<{ factor: string; averageScore: number; leadCount: number }>
+          >`
+        SELECT
+          factor_match[1] AS factor,
+          ROUND(AVG(
+            factor_match[2]::numeric
+            / NULLIF(factor_match[3]::numeric, 0)
+            * 100
+          ), 1)::float8 AS "averageScore",
+          COUNT(*)::int AS "leadCount"
+        FROM leads
+        CROSS JOIN LATERAL unnest(score_reasons) AS score_reason
+        CROSS JOIN LATERAL regexp_match(
+          score_reason,
+          '^(.+) \\(([0-9]+)/([0-9]+)\\):'
+        ) AS factor_match
+        GROUP BY factor_match[1]
+      `,
     ]);
 
     if (exportCsv) {
@@ -322,6 +344,17 @@ export async function GET(request: Request) {
         mediumPriority,
         lowPriority,
         averageScore: Math.round(scoreStats._avg.opportunityScore ?? 0),
+        averageDataQualityScore:
+          factorAggregates.find(({ factor }) => factor === "Data quality")
+            ?.averageScore ?? null,
+        topScoringFactors: factorAggregates
+          .filter(({ factor }) => factor !== "Data quality")
+          .sort(
+            (left, right) =>
+              right.averageScore - left.averageScore ||
+              left.factor.localeCompare(right.factor),
+          )
+          .slice(0, 4),
       },
       filters: {
         industries: industryRows.flatMap(({ industry }) =>

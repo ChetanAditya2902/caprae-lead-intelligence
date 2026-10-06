@@ -42,6 +42,12 @@ export type LeadListResponse = {
     mediumPriority: number;
     lowPriority: number;
     averageScore: number;
+    averageDataQualityScore: number | null;
+    topScoringFactors: Array<{
+      factor: string;
+      averageScore: number;
+      leadCount: number;
+    }>;
   };
   filters: {
     industries: string[];
