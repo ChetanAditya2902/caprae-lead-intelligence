@@ -50,6 +50,67 @@ const companyNames = [
   "Windmill Signal Systems",
 ];
 
+const generatedBrands = [
+  "Asterfield",
+  "Novaforge",
+  "Lumenway",
+  "Ironvale",
+  "Crestwave",
+  "Oakspire",
+  "Brightforge",
+  "Vantage Harbor",
+  "Everpath",
+  "Solstice Ridge",
+  "Emberline",
+  "Granitewell",
+  "Mosaic Harbor",
+  "Silverpath",
+  "Pinecrest",
+  "Redstone Valley",
+  "Cloudcrest",
+  "Noblefield",
+  "Springwell",
+  "Cobalt Ridge",
+  "Northwind",
+  "Greenstone",
+  "Harborstone",
+  "Summit Grove",
+  "Lakefront",
+  "Westlake",
+  "Crownfield",
+  "Brightwater",
+  "Ridgepoint",
+  "Amberfield",
+  "Stonewell",
+  "Suncrest",
+  "Longview",
+  "Meadowbrook",
+  "Oakmont",
+  "Silvercrest",
+  "Maplebridge",
+  "Highland",
+  "Cedarfield",
+  "Fairview",
+  "Brookstone",
+  "Grandview",
+  "Redfern",
+  "Southridge",
+];
+
+const companySuffixes = [
+  "Systems",
+  "Analytics",
+  "Technologies",
+  "Software",
+  "Networks",
+  "Platforms",
+  "Industries",
+  "Solutions",
+  "Digital",
+  "Innovations",
+  "Labs",
+];
+
 const industries = [
   ["Healthcare technology", "Clinical operations"],
   ["Data & analytics", "Business intelligence"],
@@ -59,6 +120,14 @@ const industries = [
   ["Education technology", "Workforce learning"],
   ["Cybersecurity", "Identity management"],
   ["Logistics", "Supply chain software"],
+  ["Renewable energy", "Grid management"],
+  ["Manufacturing", "Quality management"],
+  ["Fleet technology", "Transportation"],
+  ["Enterprise software", "Revenue operations"],
+  ["Agriculture technology", "Precision farming"],
+  ["Real estate technology", "Property operations"],
+  ["Telecommunications", "Network operations"],
+  ["Climate technology", "Carbon accounting"],
 ];
 
 const locations: Array<[string, string]> = [
@@ -74,6 +143,20 @@ const locations: Array<[string, string]> = [
   ["Seattle, WA", "US"],
   ["Munich", "DE"],
   ["New York, NY", "US"],
+  ["Portland, OR", "US"],
+  ["Atlanta, GA", "US"],
+  ["San Diego, CA", "US"],
+  ["Montreal, QC", "CA"],
+  ["Edinburgh", "GB"],
+  ["Amsterdam", "NL"],
+  ["Dublin", "IE"],
+  ["Stockholm", "SE"],
+  ["Paris", "FR"],
+  ["Zurich", "CH"],
+  ["Melbourne", "AU"],
+  ["Singapore", "SG"],
+  ["Raleigh, NC", "US"],
+  ["Phoenix, AZ", "US"],
 ];
 
 const technologySets = [
@@ -92,40 +175,40 @@ const employeeCounts = [
   1600, 210, 420, 105, 760, 305, 88, 1400, 195, 625, 370, 115,
 ];
 
-const annualRevenues = [
-  "185000000.00", "74000000.00", "38500000.00", "132000000.00",
-  "22000000.00", "245000000.00", "57000000.00", "16500000.00",
-  "198000000.00", "8200000.00", "91000000.00", "33000000.00",
-  "310000000.00", "26500000.00", "118000000.00", "12500000.00",
-  "156000000.00", "47000000.00", "6800000.00", "280000000.00",
-  "19500000.00", "105000000.00", "63500000.00", "14200000.00",
-];
+const seedRecordCount = 500;
+const duplicateStartIndex = seedRecordCount - 2;
+const incompleteStartIndex = 475;
 
-const scoreValues = [
-  96, 93, 91, 89, 87, 85, 84, 82, 81, 80,
-  79, 77, 76, 74, 72, 70, 68, 67, 65, 64,
-  62, 60, 58, 57, 55, 53, 51, 49, 47, 45,
-  43, 41, 39, 37, 35, 33, 31, 29, 27, 25,
-  23, 21,
-];
+function getCompanyName(index: number): string {
+  if (index < companyNames.length) return companyNames[index];
 
-function getScoreTier(index: number): ScoreTier | null {
-  if (index < 10) return ScoreTier.HIGH;
-  if (index < 22) return ScoreTier.MEDIUM;
-  if (index < 42 || index >= 46) return ScoreTier.LOW;
+  const generatedIndex = index - companyNames.length;
+  const brand = generatedBrands[Math.floor(generatedIndex / companySuffixes.length)];
+  const suffix = companySuffixes[generatedIndex % companySuffixes.length];
+  if (!brand || !suffix) {
+    throw new Error(`Unable to generate a synthetic company name for record ${index + 1}.`);
+  }
+  return `${brand} ${suffix}`;
+}
+
+function getScoreTier(index: number, duplicate: boolean): ScoreTier | null {
+  if (duplicate) return ScoreTier.LOW;
+  if (index < 75) return ScoreTier.HIGH;
+  if (index < 250) return ScoreTier.MEDIUM;
+  if (index < incompleteStartIndex) return ScoreTier.LOW;
   return null;
 }
 
 function getReasons(index: number, tier: ScoreTier | null): string[] {
   if (tier === null) return [];
-  if (index >= 46) {
+  if (index >= duplicateStartIndex) {
     return ["Duplicate-like domain; review record quality before prioritizing."];
   }
 
   const reasons: string[] = [];
-  if (index < 10) {
+  if (index < 75) {
     reasons.push("Strong company size and industry alignment.");
-  } else if (index < 25) {
+  } else if (index < 250) {
     reasons.push("Moderate company size and industry alignment.");
   } else {
     reasons.push("Limited or unconfirmed fit signals.");
@@ -137,23 +220,26 @@ function getReasons(index: number, tier: ScoreTier | null): string[] {
 }
 
 function buildSeedRecords() {
-  return Array.from({ length: 48 }, (_, index) => {
-    const duplicate = index >= 46;
+  return Array.from({ length: seedRecordCount }, (_, index) => {
+    const duplicate = index >= duplicateStartIndex;
     const sourceIndex = duplicate ? 4 : index;
-    const companyName = companyNames[sourceIndex];
+    const companyName = getCompanyName(sourceIndex);
     const domain = companyName
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "") + ".example";
     const industry = industries[sourceIndex % industries.length];
     const location = locations[sourceIndex % locations.length];
-    const tier = getScoreTier(index);
-    const incomplete = index >= 42 && index < 46;
+    const tier = getScoreTier(index, duplicate);
+    const incomplete = index >= incompleteStartIndex && index < duplicateStartIndex;
+    const employeeCount = incomplete && index === incompleteStartIndex
+      ? null
+      : employeeCounts[sourceIndex % employeeCounts.length];
     const contactAvailable = !incomplete && index % 7 !== 0;
     const emailAvailable = contactAvailable && index % 6 !== 0;
     const phoneAvailable = contactAvailable && index % 5 !== 0;
     const nameNumber = String(index + 1).padStart(3, "0");
-    const syntheticPhone = `+1-202-555-${String(100 + index).padStart(4, "0")}`;
+    const syntheticPhone = `+1-202-555-01${String(index % 100).padStart(2, "0")}`;
     const createdAt = new Date(Date.UTC(2025, 0, 1 + (index % 28)));
     const lastUpdated = new Date(Date.UTC(2026, index % 9, 1 + (index % 27)));
 
@@ -162,16 +248,20 @@ function buildSeedRecords() {
       companyName,
       website: incomplete && index % 2 === 0 ? null : `https://${domain}`,
       domain: incomplete && index % 2 === 1 ? null : domain,
-      industry: incomplete && index === 43 ? null : industry[0],
-      subIndustry: incomplete && index === 44 ? null : industry[1],
-      employeeCount: incomplete && index === 42 ? null : employeeCounts[sourceIndex % employeeCounts.length],
-      revenue: incomplete && index === 45
+      industry: incomplete && index % 4 === 1 ? null : industry[0],
+      subIndustry: incomplete && index % 4 === 2 ? null : industry[1],
+      employeeCount,
+      revenue: incomplete && index === incompleteStartIndex + 3
         ? null
-        : new Prisma.Decimal(annualRevenues[sourceIndex % annualRevenues.length]),
+        : employeeCount === null
+          ? null
+          : new Prisma.Decimal(
+              (employeeCount * (100_000 + (index % 9) * 25_000)).toFixed(2),
+            ),
       revenueCurrency: incomplete && index === 45 ? null : "USD",
-      location: incomplete && index === 43 ? null : location[0],
-      country: incomplete && index === 43 ? null : location[1],
-      technologies: incomplete && index === 44
+      location: incomplete && index % 4 === 1 ? null : location[0],
+      country: incomplete && index % 4 === 1 ? null : location[1],
+      technologies: incomplete && index % 4 === 2
         ? []
         : technologySets[sourceIndex % technologySets.length],
       hiringSignal: index % 3 === 0 ? null : `${3 + (index % 18)} open roles across product and commercial teams`,
@@ -188,7 +278,15 @@ function buildSeedRecords() {
       phoneVerified: phoneAvailable && index % 3 === 0,
       dataSource: duplicate ? "synthetic-duplicate-test" : "synthetic-challenge-seed",
       lastUpdated,
-      opportunityScore: tier === null ? null : duplicate ? 42 + (index - 46) * 4 : scoreValues[index],
+      opportunityScore: tier === null
+        ? null
+        : duplicate
+          ? 42 + (index - duplicateStartIndex) * 5
+          : tier === ScoreTier.HIGH
+            ? 85 + ((index * 7) % 15)
+            : tier === ScoreTier.MEDIUM
+              ? 60 + ((index * 7) % 20)
+              : 20 + ((index * 7) % 40),
       scoreTier: tier,
       scoreReasons: getReasons(index, tier),
       aiSummary: null,
@@ -220,7 +318,7 @@ async function main() {
         update: record,
       });
     }
-    console.info("Seeded 48 synthetic SaaSquatch lead records.");
+    console.info(`Seeded ${seedRecordCount} synthetic SaaSquatch lead records.`);
   } finally {
     await prisma.$disconnect();
   }

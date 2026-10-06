@@ -27,7 +27,7 @@ Do not commit `.env`.
 - `GET /api/leads` and `GET /api/leads/[id]` return sample records.
 - `/leads` lists sample records; `/leads/[id]` shows a record detail page.
 - `prisma/schema.prisma` defines the PostgreSQL `Lead` model and indexes.
-- `prisma/seed.ts` upserts 48 synthetic records with `.example` domains.
+- `prisma/seed.ts` upserts 500 synthetic records with `.example` domains.
 
 ## Database setup
 
