@@ -203,8 +203,11 @@ function buildSeedRecords() {
       .replace(/^-|-$/g, "") + ".example";
     const industry = industries[sourceIndex % industries.length];
     const location = locations[sourceIndex % locations.length];
+    const lowFit = index >= companyNames.length && index < duplicateStartIndex && index % 13 === 0;
     const incomplete = index >= incompleteStartIndex && index < duplicateStartIndex;
-    const employeeCount = incomplete && index === incompleteStartIndex
+    const employeeCount = lowFit
+      ? 20
+      : incomplete && index === incompleteStartIndex
       ? null
       : employeeCounts[sourceIndex % employeeCounts.length];
     const contactAvailable = !incomplete && index % 7 !== 0;
@@ -220,27 +223,59 @@ function buildSeedRecords() {
       companyName,
       website: incomplete && index % 2 === 0 ? null : `https://${domain}`,
       domain: incomplete && index % 2 === 1 ? null : domain,
-      industry: incomplete && index % 4 === 1 ? null : industry[0],
-      subIndustry: incomplete && index % 4 === 2 ? null : industry[1],
+      industry: lowFit
+        ? "General business services"
+        : incomplete && index % 4 === 1
+          ? null
+          : industry[0],
+      subIndustry: lowFit
+        ? "Legacy support operations"
+        : incomplete && index % 4 === 2
+          ? null
+          : industry[1],
       employeeCount,
-      revenue: incomplete && index === incompleteStartIndex + 3
+      revenue: lowFit
+        ? new Prisma.Decimal("250000")
+        : incomplete && index === incompleteStartIndex + 3
         ? null
         : employeeCount === null
           ? null
           : new Prisma.Decimal(
               (employeeCount * (100_000 + (index % 9) * 25_000)).toFixed(2),
             ),
-      revenueCurrency: incomplete && index === incompleteStartIndex + 3
+      revenueCurrency: !lowFit && incomplete && index === incompleteStartIndex + 3
         ? null
         : "USD",
-      location: incomplete && index % 4 === 1 ? null : location[0],
-      country: incomplete && index % 4 === 1 ? null : location[1],
-      technologies: incomplete && index % 4 === 2
-        ? []
-        : technologySets[sourceIndex % technologySets.length],
-      hiringSignal: index % 3 === 0 ? null : `${3 + (index % 18)} open roles across product and commercial teams`,
-      growthSignal: index % 4 === 0 ? null : ["New regional expansion", "Growing product portfolio", "Increasing customer adoption"][index % 3],
-      fundingSignal: index % 5 === 0 ? null : ["Seed extension", "Series A", "Series B", "Growth round"][index % 4],
+      location: lowFit
+        ? "Sao Paulo"
+        : incomplete && index % 4 === 1
+          ? null
+          : location[0],
+      country: lowFit
+        ? "BR"
+        : incomplete && index % 4 === 1
+          ? null
+          : location[1],
+      technologies: lowFit
+        ? ["On-premise proprietary CRM"]
+        : incomplete && index % 4 === 2
+          ? []
+          : technologySets[sourceIndex % technologySets.length],
+      hiringSignal: lowFit
+        ? "Hiring freeze with no open roles"
+        : index % 3 === 0
+          ? null
+          : `${3 + (index % 18)} open roles across product and commercial teams`,
+      growthSignal: lowFit
+        ? "Declining demand and contraction across core markets"
+        : index % 4 === 0
+          ? null
+          : ["New regional expansion", "Growing product portfolio", "Increasing customer adoption"][index % 3],
+      fundingSignal: lowFit
+        ? "No funding"
+        : index % 5 === 0
+          ? null
+          : ["Seed extension", "Series A", "Series B", "Growth round"][index % 4],
       contactName: contactAvailable ? `Synthetic Contact ${nameNumber}` : null,
       contactTitle: contactAvailable
         ? ["VP of Operations", "Head of Growth", "Chief Technology Officer", "Director of Partnerships"][index % 4]

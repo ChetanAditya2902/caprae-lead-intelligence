@@ -166,6 +166,16 @@ describe("scoreLead", () => {
     }
   });
 
+  it("lists missing contact fields by label in the score explanation", () => {
+    const result = scoreLead({});
+    const contact = result.factors.find(
+      (item) => item.factor === "Contact completeness",
+    );
+
+    assert.ok(contact?.reason.includes("name, job title, email, phone, LinkedIn profile"));
+    assert.ok(!contact?.reason.includes("[object Object]"));
+  });
+
   it("returns the same score for identical lead data", () => {
     const first = scoreLead(completeHighFitLead);
     const second = scoreLead(completeHighFitLead);

@@ -532,7 +532,7 @@ function scoreContactCompleteness(lead: LeadScoringInput): ScoringFactor {
     scoringFactorMaximums.contactCompleteness,
     missing.length === 0
       ? "All configured contact fields are present."
-      : `Contact details include ${present.length} of ${fields.length} fields; missing ${missing.join(", ")}.`,
+      : `Contact details include ${present.length} of ${fields.length} fields; missing ${missing.map(({ label }) => label).join(", ")}.`,
     missing.length === 0 ? "positive" : "neutral",
   );
 }
