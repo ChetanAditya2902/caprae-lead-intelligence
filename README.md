@@ -1,5 +1,25 @@
 # SaaSquatch Lead Intelligence
 
+### From lead discovery to lead prioritization.
+
+SaaSquatch already makes it easier to discover and enrich B2B leads.
+SaaSquatch Lead Intelligence adds a decision layer that helps users determine
+which discovered leads deserve attention first.
+
+The application combines a deterministic Opportunity Score with an
+AI-generated Lead Brief to turn raw lead data into actionable sales intelligence.
+
+## Core Features
+
+- 0–100 Lead Opportunity Score
+- Transparent score breakdown
+- AI Lead Brief
+- Data Quality Score
+- Advanced lead filtering
+- Search and sorting
+- CSV export
+- Lead analytics
+
 ## 1. Overview
 
 SaaSquatch Lead Intelligence is a full-stack B2B lead qualification prototype for
